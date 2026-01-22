@@ -1,0 +1,3 @@
+C:/Users/rceme/Desktop/game/out/build/GCC 13.2.0 x86_64-w64-mingw32/CMakeFiles/game_in_cmd.dir
+C:/Users/rceme/Desktop/game/out/build/GCC 13.2.0 x86_64-w64-mingw32/CMakeFiles/edit_cache.dir
+C:/Users/rceme/Desktop/game/out/build/GCC 13.2.0 x86_64-w64-mingw32/CMakeFiles/rebuild_cache.dir
