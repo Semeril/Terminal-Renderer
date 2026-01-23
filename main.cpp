@@ -1,10 +1,5 @@
 #include <bits/stdc++.h>
 #include <windows.h>
-#define WIDTH 120
-#define RECT_WIDTH 60
-#define HEIGHT 29
-#define FILL '219'
-#define FPS 60
 
 #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
@@ -23,7 +18,11 @@ struct Color
 {
     int r, g, b;
 
-    string code()
+    string background()
+    {
+        return "\033[48;2;" + to_string(r) + ';' + to_string(g) + ';' + to_string(b) + 'm';
+    }
+    string foreground()
     {
         return "\033[38;2;" + to_string(r) + ';' + to_string(g) + ';' + to_string(b) + 'm';
     }
@@ -39,19 +38,62 @@ struct Color
     Color() : r(255), g(255), b(255) {}
 };
 
+struct ColoredChar
+{
+    char c;
+    Color background_color;
+    Color foreground_color;
+    ColoredChar(char _c, Color bg, Color fg) : c(_c), background_color(bg), foreground_color(fg) {}
+    string to_string()
+    {
+        return foreground_color.foreground() + background_color.background() + c + "\033[0m";
+    }
+};
+
+struct Text
+{
+    string content;
+    Color color;
+    Text(string _content, Color _color) : content(_content), color(_color) {}
+};
+
 struct Screen
 {
     int width, height;
-    vector<vector<Color>> _list;
-    void draw(Rect &obj, Color color)
+    vector<vector<ColoredChar>> _list;
+    void draw(Rect obj, Color color)
     {
         Rect printable = make_printable(obj);
         for (size_t dy = 0; dy < printable.height; dy++)
         {
             for (size_t dx = 0; dx < printable.width; dx++)
             {
-                _list.at(printable.y + dy)[printable.x + dx] = color;
+                _list.at(printable.y + dy)[printable.x + dx] = ColoredChar(' ', color, color);
             }
+        }
+    }
+    void draw(Text text, int x, int y)
+    {
+        int px = x;
+        int py = y;
+        for (char ch : text.content)
+        {
+            if (px >= width)
+            {
+                break;
+            }
+            if (ch == '\n')
+            {
+                px = x;
+                py++;
+                if (py >= height)
+                {
+                    break;
+                }
+                continue;
+            }
+            _list.at(py)[px] = ColoredChar(ch, Color(), text.color);
+            px++;
         }
     }
 
@@ -86,23 +128,33 @@ struct Screen
         return obj;
     }
 
+    void clear()
+    {
+        for (auto &row : _list)
+        {
+            for (auto &ch : row)
+            {
+                ch = ColoredChar(' ', Color(), Color());
+            }
+        }
+    }
+
     void show()
     {
         cout << "\033[H";
         string display;
         display.reserve(width * height * 20);
-        for (auto &row : _list)
+        for (auto row : _list)
         {
-            for (auto &color : row)
+            for (auto ch : row)
             {
-                display += color.code() + (char)219;
-                color = Color();
+                display += ch.to_string();
             }
-            display += "\033[0m\n";
+            display += "\n";
         }
         cout << display;
     }
-    Screen(int w, int h) : width(w), height(h), _list(height, vector<Color>(width, Color())) {}
+    Screen(int w, int h) : width(w), height(h), _list(height, vector<ColoredChar>(width, ColoredChar(' ', Color(), Color()))) {}
 };
 
 bool ispressed(int vk_code)
@@ -112,7 +164,9 @@ bool ispressed(int vk_code)
 
 int main()
 {
-
+    cin.tie(nullptr);
+    ios::sync_with_stdio(false);
+    const auto FPS = 60, FRAME_TIME = 1000 / FPS, WIDTH = 120, HEIGHT = 29, RECT_WIDTH = 60;
     {
         HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
         DWORD dwMode = 0;
@@ -123,28 +177,33 @@ int main()
 
     Screen screen(WIDTH, HEIGHT);
     Rect box{RECT_WIDTH / 2, HEIGHT / 2, 1.5, 1};
-    cout << "\033[2J\033[?25l";
+    cout << "\033[2J\033[?25l\033[0m";
+
     while (true)
     {
+        auto frame_start = chrono::steady_clock::now();
+
+        // --- INPUT ---
         if (ispressed('D'))
-        {
             box.x += 0.5;
-        }
         if (ispressed('A'))
-        {
             box.x -= 0.5;
-        }
         if (ispressed('W'))
-        {
             box.y -= 0.5;
-        }
         if (ispressed('S'))
-        {
             box.y += 0.5;
-        }
+
+        // --- RENDER ---
+        screen.clear();
         screen.draw(box, Color(255, 0, 0));
         screen.show();
-        Sleep(1000 / FPS);
+
+        // --- FRAME LIMIT ---
+        auto frame_time =
+            chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - frame_start).count();
+
+        if (frame_time < FRAME_TIME)
+            this_thread::sleep_for(chrono::milliseconds(FRAME_TIME - frame_time));
     }
 
     return 0;
