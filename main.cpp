@@ -212,14 +212,18 @@ int main()
             paddle1.y = HEIGHT - paddle1.height;
         if (paddle2.y + paddle2.height > HEIGHT)
             paddle2.y = HEIGHT - paddle2.height;
-        ball.x += ball_dx;
-        ball.y += ball_dy;
-        if (ball.y <= 0 || ball.y + ball.height >= HEIGHT)
-            ball_dy = -ball_dy;
-        if (ball.collides(paddle1) || ball.collides(paddle2))
+        int it = 5;
+        for (int i = 0; i < it; i++)
         {
-            ball.x -= ball_dx;
-            ball_dx = -ball_dx;
+            ball.x += ball_dx / it;
+            ball.y += ball_dy / it;
+            if (ball.y <= 0 || ball.y + ball.height >= HEIGHT)
+                ball_dy = -ball_dy;
+            if (ball.collides(paddle1) || ball.collides(paddle2))
+            {
+                ball.x -= ball_dx / it;
+                ball_dx = -ball_dx;
+            }
         }
 
         // --- RENDER ---
