@@ -217,10 +217,14 @@ int main()
         if (ball.y <= 0 || ball.y + ball.height >= HEIGHT)
             ball_dy = -ball_dy;
         if (ball.collides(paddle1) || ball.collides(paddle2))
+        {
+            ball.x -= ball_dx;
             ball_dx = -ball_dx;
+        }
 
         // --- RENDER ---
         screen.clear();
+        screen.draw(Rect(0, 0, RECT_WIDTH, HEIGHT), Color(0, 0, 0));
         screen.draw(ball, Color(255, 0, 0));
         screen.draw(paddle1, Color(255, 165, 0));
         screen.draw(paddle2, Color(255, 165, 0));
