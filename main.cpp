@@ -180,26 +180,50 @@ int main()
     }
 
     Screen screen(WIDTH, HEIGHT);
-    Rect box{RECT_WIDTH / 2, HEIGHT / 2, 1.5, 1};
+    Rect ball(RECT_WIDTH / 2, HEIGHT / 2, 1, 1), paddle1(2, HEIGHT / 2 - 3, 1, 6), paddle2(RECT_WIDTH - 3, HEIGHT / 2 - 3, 1, 6);
+    double ball_dx = 0.5, ball_dy = 0.5;
+    double acceleration = 1.00001;
     cout << "\033[2J\033[?25l\033[0m";
 
     while (true)
     {
         auto frame_start = chrono::steady_clock::now();
+        ball_dx *= acceleration;
+        ball_dy *= acceleration;
+        acceleration += 0.000001;
 
         // --- INPUT ---
-        if (ispressed('D'))
-            box.x += 0.5;
-        if (ispressed('A'))
-            box.x -= 0.5;
+        if (ispressed(VK_UP))
+            paddle2.y -= 0.5;
+        if (ispressed(VK_DOWN))
+            paddle2.y += 0.5;
         if (ispressed('W'))
-            box.y -= 0.5;
+            paddle1.y -= 0.5;
         if (ispressed('S'))
-            box.y += 0.5;
+            paddle1.y += 0.5;
+        if (ispressed(VK_ESCAPE))
+            break;
+        // --- UPDATE ---
+        if (paddle1.y < 0)
+            paddle1.y = 0;
+        if (paddle2.y < 0)
+            paddle2.y = 0;
+        if (paddle1.y + paddle1.height > HEIGHT)
+            paddle1.y = HEIGHT - paddle1.height;
+        if (paddle2.y + paddle2.height > HEIGHT)
+            paddle2.y = HEIGHT - paddle2.height;
+        ball.x += ball_dx;
+        ball.y += ball_dy;
+        if (ball.y <= 0 || ball.y + ball.height >= HEIGHT)
+            ball_dy = -ball_dy;
+        if (ball.collides(paddle1) || ball.collides(paddle2))
+            ball_dx = -ball_dx;
 
         // --- RENDER ---
         screen.clear();
-        screen.draw(box, Color(255, 0, 0));
+        screen.draw(ball, Color(255, 0, 0));
+        screen.draw(paddle1, Color(255, 165, 0));
+        screen.draw(paddle2, Color(255, 165, 0));
         screen.show();
 
         // --- FRAME LIMIT ---
