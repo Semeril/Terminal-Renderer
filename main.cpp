@@ -12,6 +12,10 @@ struct Rect
     double x, y, width, height;
     Rect() : x(0), y(0), width(0), height(0) {}
     Rect(double _x, double _y, double _w, double _h) : x(_x), y(_y), width(_w), height(_h) {}
+    bool collides(Rect other)
+    {
+        return !(x + width < other.x || other.x + other.width < x || y + height < other.y || other.y + other.height < y);
+    }
 };
 
 struct Color
@@ -143,7 +147,7 @@ struct Screen
     {
         cout << "\033[H";
         string display;
-        display.reserve(width * height * 20);
+        display.reserve((width + 1) * (height + 1) * (22 + 22 + 1 + 7 + 1));
         for (auto row : _list)
         {
             for (auto ch : row)
