@@ -53,6 +53,11 @@ struct Text
     Text(string _content, Color _color) : content(_content), color(_color) {}
 };
 
+string move_cursor(int x, int y)
+{
+    return "\033[" + to_string(y + 1) + ";" + to_string(x + 1) + "H";
+}
+
 class Screen
 {
     int width, height;
@@ -99,10 +104,10 @@ public:
     }
     Rect &scale(Rect &obj)
     {
-        obj.x = floor(obj.x * 2);
-        obj.y = floor(obj.y);
-        obj.width = floor(obj.width * 2);
-        obj.height = floor(obj.height);
+        obj.x = round(obj.x * 2);
+        obj.y = round(obj.y);
+        obj.width = round(obj.width * 2);
+        obj.height = round(obj.height);
         return obj;
     }
     void clear()
@@ -126,37 +131,44 @@ public:
         }
         return c;
     }
-    void show()
+    string changes()
     {
-        cout << "\033[H";
-        string display;
+        string changes;
         for (size_t y = 0; y < height; y++)
         {
             for (size_t x = 0; x < width; x++)
             {
-                if (x == 0)
+                if (front_buffer.at(y * width + x).c != back_buffer.at(y * width + x).c ||
+                    front_buffer.at(y * width + x).background_color != back_buffer.at(y * width + x).background_color ||
+                    front_buffer.at(y * width + x).foreground_color != back_buffer.at(y * width + x).foreground_color)
                 {
-                    display += _list.at(y * width + x).background_color.background();
-                    display += _list.at(y * width + x).foreground_color.foreground();
+                    changes += move_cursor(x, y);
+                    changes += back_buffer.at(y * width + x).background_color.background();
+                    changes += back_buffer.at(y * width + x).foreground_color.foreground();
+                    changes += back_buffer.at(y * width + x).c;
                 }
-                else
-                {
-                    if (_list.at(y * width + x).background_color != _list.at(y * width + x - 1).background_color)
-                    {
-                        display += _list.at(y * width + x).background_color.background();
-                    }
-                    if (_list.at(y * width + x).foreground_color != _list.at(y * width + x - 1).foreground_color)
-                    {
-                        display += _list.at(y * width + x).foreground_color.foreground();
-                    }
-                }
-
-                display += _list.at(y * width + x).c;
             }
-            display += "\n";
         }
-        cout << display;
+        return changes;
     }
+    int changes_len()
+    {
+        int cnt = 0;
+        for (size_t y = 0; y < height; y++)
+        {
+            for (size_t x = 0; x < width; x++)
+            {
+                if (front_buffer.at(y * width + x).c != back_buffer.at(y * width + x).c ||
+                    front_buffer.at(y * width + x).background_color != back_buffer.at(y * width + x).background_color ||
+                    front_buffer.at(y * width + x).foreground_color != back_buffer.at(y * width + x).foreground_color)
+                {
+                    cnt++;
+                }
+            }
+        }
+        return cnt;
+    }
+
     Screen(int w, int h) : width(w),
                            height(h),
                            back_buffer(height * width, ColoredChar(' ', Color(255, 255, 255), Color(255, 255, 255))),
@@ -206,36 +218,28 @@ int main()
             paddle1.y -= 0.5;
         if (ispressed('S'))
             paddle1.y += 0.5;
-        if (ispressed(VK_RIGHT))
-        {
-            paddle2.x += 0.5;
-        }
-        if (ispressed(VK_LEFT))
-        {
-            paddle2.x -= 0.5;
-        }
         if (ispressed(VK_ESCAPE))
             break;
         // --- UPDATE ---
-        // if (paddle1.y < 0)
-        //     paddle1.y = 0;
-        // if (paddle2.y < 0)
-        //     paddle2.y = 0;
-        // if (paddle1.y + paddle1.height > HEIGHT)
-        //     paddle1.y = HEIGHT - paddle1.height;
-        // if (paddle2.y + paddle2.height > HEIGHT)
-        //     paddle2.y = HEIGHT - paddle2.height;
+        if (paddle1.y < 0)
+            paddle1.y = 0;
+        if (paddle2.y < 0)
+            paddle2.y = 0;
+        if (paddle1.y + paddle1.height > HEIGHT)
+            paddle1.y = HEIGHT - paddle1.height;
+        if (paddle2.y + paddle2.height > HEIGHT)
+            paddle2.y = HEIGHT - paddle2.height;
         int it = 5;
         for (int i = 0; i < it; i++)
         {
             ball.x += ball_dx / it;
             ball.y += ball_dy / it;
-            if (ball.y <= 0 || ball.y + ball.height >= HEIGHT)
+            if (ball.y <= 0 || ball.y + ball.height > HEIGHT)
                 ball_dy = -ball_dy;
             if (ball.collides(paddle1) || ball.collides(paddle2))
             {
-                ball.x -= ball_dx / it;
                 ball_dx = -ball_dx;
+                ball_dy += ((rand() % 100) / 100.0 - 0.5) * 0.5;
             }
         }
 
@@ -243,10 +247,12 @@ int main()
         screen.clear();
         screen.draw(Rect(0, 0, RECT_WIDTH, HEIGHT), Color(0, 0, 0));
         screen.draw(ball, Color(255, 0, 0));
-        screen.draw(Text("Frame_time: " + to_string(frame_time), Color(255, 255, 255)), 0, 0);
         screen.draw(paddle1, Color(255, 165, 0));
         screen.draw(paddle2, Color(255, 165, 0));
-        cout << screen.changes();
+        screen.draw(Text("Frame time: " + to_string(frame_time), Color(0, 255, 255)), 0, 0);
+        screen.draw(Text("Changes: ~" + to_string(screen.changes_len() - 11), Color(0, 255, 255)), 0, 1);
+
+        cout << screen.changes() << flush;
         screen.update();
 
         // --- FRAME LIMIT ---
