@@ -121,9 +121,9 @@ public:
     string canvas()
     {
         string c = "\033[48;2;255;255;255m";
-        for (int y = 0; y < height; y++)
+        for (size_t y = 0; y < height; y++)
         {
-            for (int x = 0; x < width; x++)
+            for (size_t x = 0; x < width; x++)
             {
                 c += " ";
             }
@@ -134,10 +134,9 @@ public:
     string changes()
     {
         string changes;
-        changes.reserve(width * height * 20);
-        for (int y = 0; y < height; y++)
+        for (size_t y = 0; y < height; y++)
         {
-            for (int x = 0; x < width; x++)
+            for (size_t x = 0; x < width; x++)
             {
                 if (front_buffer.at(y * width + x).c != back_buffer.at(y * width + x).c ||
                     front_buffer.at(y * width + x).background_color != back_buffer.at(y * width + x).background_color ||
@@ -155,9 +154,9 @@ public:
     int changes_len()
     {
         int cnt = 0;
-        for (int y = 0; y < height; y++)
+        for (size_t y = 0; y < height; y++)
         {
-            for (int x = 0; x < width; x++)
+            for (size_t x = 0; x < width; x++)
             {
                 if (front_buffer.at(y * width + x).c != back_buffer.at(y * width + x).c ||
                     front_buffer.at(y * width + x).background_color != back_buffer.at(y * width + x).background_color ||
@@ -185,8 +184,6 @@ int main()
 {
     cin.tie(nullptr);
     ios::sync_with_stdio(false);
-    srand((unsigned)time(nullptr));
-
     const auto FPS = 60, FRAME_TIME = 1000 / FPS, WIDTH = 120, HEIGHT = 29, RECT_WIDTH = 60;
     {
         HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -238,10 +235,7 @@ int main()
             ball.x += ball_dx / it;
             ball.y += ball_dy / it;
             if (ball.y <= 0 || ball.y + ball.height > HEIGHT)
-            {
-                ball.y = clamp(ball.y, 0.0, HEIGHT - ball.height);
                 ball_dy = -ball_dy;
-            }
             if (ball.collides(paddle1) || ball.collides(paddle2))
             {
                 ball_dx = -ball_dx;
