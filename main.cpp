@@ -14,7 +14,7 @@ struct Rect
     Rect(double _x, double _y, double _w, double _h) : x(_x), y(_y), width(_w), height(_h) {}
     bool collides(Rect other)
     {
-        return !(x + width < other.x || other.x + other.width < x || y + height < other.y || other.y + other.height < y);
+        return !(x + width <= other.x || other.x + other.width <= x || y + height <= other.y || other.y + other.height <= y);
     }
 };
 
@@ -34,7 +34,7 @@ struct Color
     {
         return r != other.r || g != other.g || b != other.b;
     }
-
+    Color() = default;
     Color(uint8_t _r, uint8_t _g, uint8_t _b) : r(_r), g(_g), b(_b) {}
 };
 
@@ -66,10 +66,10 @@ class Screen
 public:
     void draw(Rect rect, Color color)
     {
-        scale(rect);
-        for (size_t dy = 0; dy < rect.height; dy++)
+        rect = scale(rect);
+        for (int dy = 0; dy < rect.height; dy++)
         {
-            for (size_t dx = 0; dx < rect.width; dx++)
+            for (int dx = 0; dx < rect.width; dx++)
             {
                 if (rect.y + dy >= height || rect.x + dx >= width || rect.y + dy < 0 || rect.x + dx < 0)
                     continue;
@@ -102,7 +102,7 @@ public:
             px++;
         }
     }
-    Rect &scale(Rect &obj)
+    Rect scale(Rect obj)
     {
         obj.x = round(obj.x * 2);
         obj.y = round(obj.y);
@@ -121,9 +121,9 @@ public:
     string canvas()
     {
         string c = "\033[48;2;255;255;255m";
-        for (size_t y = 0; y < height; y++)
+        for (int y = 0; y < height; y++)
         {
-            for (size_t x = 0; x < width; x++)
+            for (int x = 0; x < width; x++)
             {
                 c += " ";
             }
@@ -134,9 +134,10 @@ public:
     string changes()
     {
         string changes;
-        for (size_t y = 0; y < height; y++)
+        changes.reserve(width * height * 20);
+        for (int y = 0; y < height; y++)
         {
-            for (size_t x = 0; x < width; x++)
+            for (int x = 0; x < width; x++)
             {
                 if (front_buffer.at(y * width + x).c != back_buffer.at(y * width + x).c ||
                     front_buffer.at(y * width + x).background_color != back_buffer.at(y * width + x).background_color ||
@@ -154,9 +155,9 @@ public:
     int changes_len()
     {
         int cnt = 0;
-        for (size_t y = 0; y < height; y++)
+        for (int y = 0; y < height; y++)
         {
-            for (size_t x = 0; x < width; x++)
+            for (int x = 0; x < width; x++)
             {
                 if (front_buffer.at(y * width + x).c != back_buffer.at(y * width + x).c ||
                     front_buffer.at(y * width + x).background_color != back_buffer.at(y * width + x).background_color ||
@@ -184,6 +185,8 @@ int main()
 {
     cin.tie(nullptr);
     ios::sync_with_stdio(false);
+    srand((unsigned)time(nullptr));
+
     const auto FPS = 60, FRAME_TIME = 1000 / FPS, WIDTH = 120, HEIGHT = 29, RECT_WIDTH = 60;
     {
         HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -235,7 +238,10 @@ int main()
             ball.x += ball_dx / it;
             ball.y += ball_dy / it;
             if (ball.y <= 0 || ball.y + ball.height > HEIGHT)
+            {
+                ball.y = clamp(ball.y, 0.0, HEIGHT - ball.height);
                 ball_dy = -ball_dy;
+            }
             if (ball.collides(paddle1) || ball.collides(paddle2))
             {
                 ball_dx = -ball_dx;
