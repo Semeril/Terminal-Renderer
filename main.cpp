@@ -20,7 +20,7 @@ struct Rect
 
 struct Color
 {
-    int r, g, b;
+    uint8_t r, g, b;
 
     string background()
     {
@@ -30,16 +30,12 @@ struct Color
     {
         return "\033[38;2;" + to_string(r) + ';' + to_string(g) + ';' + to_string(b) + 'm';
     }
-
-    Color(int _r, int _g, int _b)
-        : r(_r), g(_g), b(_b)
+    bool operator!=(const Color other) const
     {
-        if (_r > 255 || _g > 255 || _b > 255)
-        {
-            throw invalid_argument("Color value must be less than 256!");
-        }
+        return r != other.r || g != other.g || b != other.b;
     }
-    Color() : r(255), g(255), b(255) {}
+
+    Color(uint8_t _r, uint8_t _g, uint8_t _b) : r(_r), g(_g), b(_b) {}
 };
 
 struct ColoredChar
@@ -48,10 +44,6 @@ struct ColoredChar
     Color background_color;
     Color foreground_color;
     ColoredChar(char _c, Color bg, Color fg) : c(_c), background_color(bg), foreground_color(fg) {}
-    string to_string()
-    {
-        return foreground_color.foreground() + background_color.background() + c + "\033[0m";
-    }
 };
 
 struct Text
@@ -61,18 +53,23 @@ struct Text
     Text(string _content, Color _color) : content(_content), color(_color) {}
 };
 
-struct Screen
+class Screen
 {
     int width, height;
-    vector<vector<ColoredChar>> _list;
-    void draw(Rect obj, Color color)
+    vector<ColoredChar> back_buffer, front_buffer;
+
+public:
+    void draw(Rect rect, Color color)
     {
-        Rect printable = make_printable(obj);
-        for (size_t dy = 0; dy < printable.height; dy++)
+        scale(rect);
+        for (size_t dy = 0; dy < rect.height; dy++)
         {
-            for (size_t dx = 0; dx < printable.width; dx++)
+            for (size_t dx = 0; dx < rect.width; dx++)
             {
-                _list.at(printable.y + dy)[printable.x + dx] = ColoredChar(' ', color, color);
+                if (rect.y + dy >= height || rect.x + dx >= width || rect.y + dy < 0 || rect.x + dx < 0)
+                    continue;
+                else
+                    back_buffer.at((rect.y + dy) * width + (rect.x + dx)) = ColoredChar(' ', color, color);
             }
         }
     }
@@ -96,69 +93,74 @@ struct Screen
                 }
                 continue;
             }
-            _list.at(py)[px] = ColoredChar(ch, Color(), text.color);
+            back_buffer.at(py * width + px) = ColoredChar(ch, back_buffer.at(py * width + px).background_color, text.color);
             px++;
         }
     }
-
-    Rect make_printable(Rect obj)
+    Rect &scale(Rect &obj)
     {
         obj.x = floor(obj.x * 2);
         obj.y = floor(obj.y);
         obj.width = floor(obj.width * 2);
         obj.height = floor(obj.height);
-        int dw = (width) - (obj.x + obj.width);
-        int dh = (height) - (obj.y + obj.height);
-        if (dh < 0)
-        {
-            obj.height += dh;
-        }
-        if (obj.y < 0)
-        {
-            obj.height += obj.y;
-        }
-        if (dw < 0)
-        {
-            obj.width += dw;
-        }
-        if (obj.x < 0)
-        {
-            obj.width += obj.x;
-        }
-        obj.y = max(min(obj.y, (double)height), .0);
-        obj.height = max(.0, obj.height);
-        obj.x = max(min(obj.x, (double)width), .0);
-        obj.width = max(.0, obj.width);
         return obj;
     }
-
     void clear()
     {
-        for (auto &row : _list)
-        {
-            for (auto &ch : row)
-            {
-                ch = ColoredChar(' ', Color(), Color());
-            }
-        }
+        fill(back_buffer.begin(), back_buffer.end(), ColoredChar(' ', Color(255, 255, 255), Color(255, 255, 255)));
     }
-
+    void update()
+    {
+        front_buffer = back_buffer;
+    }
+    string canvas()
+    {
+        string c = "\033[48;2;255;255;255m";
+        for (size_t y = 0; y < height; y++)
+        {
+            for (size_t x = 0; x < width; x++)
+            {
+                c += " ";
+            }
+            c += "\n";
+        }
+        return c;
+    }
     void show()
     {
         cout << "\033[H";
         string display;
-        display.reserve((width + 1) * (height + 1) * (22 + 22 + 1 + 7 + 1));
-        for (auto row : _list)
+        for (size_t y = 0; y < height; y++)
         {
-            for (auto ch : row)
+            for (size_t x = 0; x < width; x++)
             {
-                display += ch.to_string();
+                if (x == 0)
+                {
+                    display += _list.at(y * width + x).background_color.background();
+                    display += _list.at(y * width + x).foreground_color.foreground();
+                }
+                else
+                {
+                    if (_list.at(y * width + x).background_color != _list.at(y * width + x - 1).background_color)
+                    {
+                        display += _list.at(y * width + x).background_color.background();
+                    }
+                    if (_list.at(y * width + x).foreground_color != _list.at(y * width + x - 1).foreground_color)
+                    {
+                        display += _list.at(y * width + x).foreground_color.foreground();
+                    }
+                }
+
+                display += _list.at(y * width + x).c;
             }
             display += "\n";
         }
         cout << display;
     }
-    Screen(int w, int h) : width(w), height(h), _list(height, vector<ColoredChar>(width, ColoredChar(' ', Color(), Color()))) {}
+    Screen(int w, int h) : width(w),
+                           height(h),
+                           back_buffer(height * width, ColoredChar(' ', Color(255, 255, 255), Color(255, 255, 255))),
+                           front_buffer(height * width, ColoredChar(' ', Color(255, 255, 255), Color(255, 255, 255))) {}
 };
 
 bool ispressed(int vk_code)
@@ -183,7 +185,10 @@ int main()
     Rect ball(RECT_WIDTH / 2, HEIGHT / 2, 1, 1), paddle1(2, HEIGHT / 2 - 3, 1, 6), paddle2(RECT_WIDTH - 3, HEIGHT / 2 - 3, 1, 6);
     double ball_dx = 0.5, ball_dy = 0.5;
     double acceleration = 1.00001;
-    cout << "\033[2J\033[?25l\033[0m";
+    cout << "\033[2J\033[?25l\033[H"; // Clear screen and hide cursor
+    int64_t frame_time = 16;
+
+    cout << screen.canvas();
 
     while (true)
     {
@@ -201,17 +206,25 @@ int main()
             paddle1.y -= 0.5;
         if (ispressed('S'))
             paddle1.y += 0.5;
+        if (ispressed(VK_RIGHT))
+        {
+            paddle2.x += 0.5;
+        }
+        if (ispressed(VK_LEFT))
+        {
+            paddle2.x -= 0.5;
+        }
         if (ispressed(VK_ESCAPE))
             break;
         // --- UPDATE ---
-        if (paddle1.y < 0)
-            paddle1.y = 0;
-        if (paddle2.y < 0)
-            paddle2.y = 0;
-        if (paddle1.y + paddle1.height > HEIGHT)
-            paddle1.y = HEIGHT - paddle1.height;
-        if (paddle2.y + paddle2.height > HEIGHT)
-            paddle2.y = HEIGHT - paddle2.height;
+        // if (paddle1.y < 0)
+        //     paddle1.y = 0;
+        // if (paddle2.y < 0)
+        //     paddle2.y = 0;
+        // if (paddle1.y + paddle1.height > HEIGHT)
+        //     paddle1.y = HEIGHT - paddle1.height;
+        // if (paddle2.y + paddle2.height > HEIGHT)
+        //     paddle2.y = HEIGHT - paddle2.height;
         int it = 5;
         for (int i = 0; i < it; i++)
         {
@@ -230,12 +243,14 @@ int main()
         screen.clear();
         screen.draw(Rect(0, 0, RECT_WIDTH, HEIGHT), Color(0, 0, 0));
         screen.draw(ball, Color(255, 0, 0));
+        screen.draw(Text("Frame_time: " + to_string(frame_time), Color(255, 255, 255)), 0, 0);
         screen.draw(paddle1, Color(255, 165, 0));
         screen.draw(paddle2, Color(255, 165, 0));
-        screen.show();
+        cout << screen.changes();
+        screen.update();
 
         // --- FRAME LIMIT ---
-        auto frame_time =
+        frame_time =
             chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - frame_start).count();
 
         if (frame_time < FRAME_TIME)
