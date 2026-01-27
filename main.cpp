@@ -206,7 +206,7 @@ int main()
     Rect ball(WIDTH / 2, HEIGHT / 2, 2, 2), paddle1(2, HEIGHT / 2 - 3, 2, 12), paddle2(WIDTH - 4, HEIGHT / 2 - 3, 2, 12);
     double ball_dx = 0.5, ball_dy = 0.5;
     double acceleration = 1.00001;
-    State state = START;
+    State state = PONG;
 
     cout << "\033[2J\033[?25l\033[H"; // Clear screen and hide cursor
     int64_t frame_time = 16;
