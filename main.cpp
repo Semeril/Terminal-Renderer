@@ -7,12 +7,6 @@
 
 using namespace std;
 
-enum State
-{
-    PONG,
-    START
-};
-
 struct Rect
 {
     double x, y, width, height;
@@ -21,6 +15,10 @@ struct Rect
     bool collides(Rect other)
     {
         return !(x + width <= other.x || other.x + other.width <= x || y + height <= other.y || other.y + other.height <= y);
+    }
+    bool operator==(const Rect other) const
+    {
+        return x == other.x && y == other.y && width == other.width && height == other.height;
     }
 };
 
@@ -91,37 +89,6 @@ class Screen
         }
     }
 
-public:
-    void draw(Rect rect, Color color)
-    {
-        rect = round_values(rect);
-        for (int dy = 0; dy < rect.height; dy++)
-        {
-            for (int dx = 0; dx < rect.width; dx++)
-            {
-                if (rect.y + dy >= height * 2 || rect.x + dx >= width || rect.y + dy < 0 || rect.x + dx < 0)
-                    continue;
-                else
-                    setpx(rect.x + dx, rect.y + dy, color);
-            }
-        }
-    }
-
-    Rect round_values(Rect obj)
-    {
-        return {floor(obj.x), floor(obj.y), floor(obj.width), floor(obj.height)};
-    }
-
-    void clear()
-    {
-        fill(back_buffer.begin(), back_buffer.end(), Cell(Color(255, 255, 255), Color(255, 255, 255)));
-    }
-
-    void update()
-    {
-        front_buffer = back_buffer;
-    }
-
     string canvas()
     {
         string c = u8"\033[48;2;255;255;255m";
@@ -135,22 +102,10 @@ public:
         }
         return c;
     }
-
-    void draw(Texture texture, double x_pos, double y_pos)
+    Rect round_values(Rect obj)
     {
-        int x_start = round(x_pos), y_start = round(y_pos);
-        for (int y = 0; y < texture.height; y++)
-        {
-            for (int x = 0; x < texture.width; x++)
-            {
-                if (y_start + y >= height * 2 || x_start + x >= width || y_start + y < 0 || x_start + x < 0)
-                    continue;
-                else
-                    setpx(x_start + x, y_start + y, texture.data.at(y * texture.width + x));
-            }
-        }
+        return {floor(obj.x), floor(obj.y), floor(obj.width), floor(obj.height)};
     }
-
     string changes()
     {
         int last_x, last_y;
@@ -175,10 +130,52 @@ public:
         return changes;
     }
 
+public:
+    void draw(Rect rect, Color color)
+    {
+        rect = round_values(rect);
+        for (int dy = 0; dy < rect.height; dy++)
+        {
+            for (int dx = 0; dx < rect.width; dx++)
+            {
+                if (rect.y + dy >= height * 2 || rect.x + dx >= width || rect.y + dy < 0 || rect.x + dx < 0)
+                    continue;
+                else
+                    setpx(rect.x + dx, rect.y + dy, color);
+            }
+        }
+    }
+
+    void clear()
+    {
+        fill(back_buffer.begin(), back_buffer.end(), Cell(Color(255, 255, 255), Color(255, 255, 255)));
+    }
+
+    void update()
+    {
+        cout << changes() << flush;
+        front_buffer = back_buffer;
+    }
+
+    void draw(Texture texture, double x_pos, double y_pos)
+    {
+        int x_start = round(x_pos), y_start = round(y_pos);
+        for (int y = 0; y < texture.height; y++)
+        {
+            for (int x = 0; x < texture.width; x++)
+            {
+                if (y_start + y >= height * 2 || x_start + x >= width || y_start + y < 0 || x_start + x < 0)
+                    continue;
+                else
+                    setpx(x_start + x, y_start + y, texture.data.at(y * texture.width + x));
+            }
+        }
+    }
+
     Screen(int w, int h) : width(w),
                            height(h / 2),
                            back_buffer(height * width, Cell(Color(255, 255, 255), Color(255, 255, 255))),
-                           front_buffer(height * width, Cell(Color(255, 255, 255), Color(255, 255, 255))) {}
+                           front_buffer(height * width, Cell(Color(255, 255, 255), Color(255, 255, 255))) { cout << "\033[2J\033[?25l\033[H" << canvas(); }
 };
 
 bool ispressed(int vk_code)
@@ -186,11 +183,53 @@ bool ispressed(int vk_code)
     return GetAsyncKeyState(vk_code) & 0x8000;
 }
 
-int main()
+void count_frames(std::chrono::_V2::steady_clock::time_point &frame_start, std::chrono::_V2::steady_clock::time_point &fps_clock, int &real_fps, int &frame_count)
 {
-
-    const auto FPS = 60, FRAME_TIME = 1000 / FPS, WIDTH = 120, HEIGHT = 29 * 2;
+    if (frame_start - fps_clock >= 1s)
     {
+        fps_clock = frame_start;
+        real_fps = frame_count;
+        frame_count = 0;
+    }
+    else
+    {
+        frame_count++;
+    }
+}
+void tick(std::chrono::_V2::steady_clock::time_point &frame_start, const int FPS)
+{
+    while (std::chrono::steady_clock::now() - frame_start < 1000ms / FPS)
+    {
+        _mm_pause();
+    }
+}
+void print_fps(int real_fps)
+{
+    cout << move_cursor(0, 0) << Color(0, 0, 0).background() << Color(255, 255, 255).foreground() << "FPS: " << real_fps;
+}
+
+/// @brief Base class for creating a console game.
+/// Inherit from this class and implement the update() and render() methods.
+/// @note Use 'screen' member to draw on the console.
+/// @note Call runs() method in the game loop to check if the game should continue running.
+/// @note Call run() method in the game loop to update and render the game.
+/// @note Press ESC key to exit the game.
+/// @note Make sure to set the console to use UTF-8 encoding for proper rendering.
+/// @note 'WIDTH' and 'HEIGHT' member variables define the console dimensions in characters.
+class Game
+{
+private:
+    int FPS, frame_count = 0, real_fps = 60;
+    chrono::steady_clock::time_point fps_clock = chrono::steady_clock::now();
+
+protected:
+    Screen screen;
+    int WIDTH, HEIGHT;
+
+public:
+    Game(int fps, int width, int height) : FPS(fps), WIDTH(width), HEIGHT(height), screen(width, height)
+    {
+        srand(time(nullptr));
         SetConsoleOutputCP(CP_UTF8);
         SetConsoleCP(CP_UTF8);
         cin.tie(nullptr);
@@ -200,115 +239,129 @@ int main()
         GetConsoleMode(hOut, &dwMode);
         dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
         SetConsoleMode(hOut, dwMode);
+    };
+    bool runs()
+    {
+        return !ispressed(VK_ESCAPE);
     }
-
-    Screen screen(WIDTH, HEIGHT);
-    Rect ball(WIDTH / 2, HEIGHT / 2, 2, 2), paddle1(2, HEIGHT / 2 - 3, 2, 12), paddle2(WIDTH - 4, HEIGHT / 2 - 3, 2, 12);
-    double ball_dx = 0.5, ball_dy = 0.5;
-    double acceleration = 1.00001;
-    State state = PONG;
-
-    cout << "\033[2J\033[?25l\033[H"; // Clear screen and hide cursor
-    int64_t frame_time = 16;
-    int fps_count = 0;
-    int fps = 60;
-    auto fps_clock = chrono::steady_clock::now();
-
-    cout << screen.canvas();
-
-    while (true)
+    void run()
     {
         auto frame_start = chrono::steady_clock::now();
-        if (chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - fps_clock).count() >= 1)
-        {
-            fps_clock = chrono::steady_clock::now();
-            fps = fps_count;
-            fps_count = 0;
-        }
-        else
-        {
-            fps_count++;
-        }
+        count_frames(frame_start, fps_clock, real_fps, frame_count);
         screen.clear();
-        switch (state)
-        {
-        case START:
-            cout << move_cursor(WIDTH / 2, HEIGHT / 4) << Color(0, 0, 0).foreground() << "Pong Game";
-            break;
-        case PONG:
-            ball_dx *= acceleration;
-            ball_dy *= acceleration;
-            acceleration += 0.000001;
-
-            // --- INPUT ---
-            if (ispressed(VK_UP))
-                paddle2.y -= 0.5;
-            if (ispressed(VK_DOWN))
-                paddle2.y += 0.5;
-            if (ispressed('W'))
-                paddle1.y -= 0.5;
-            if (ispressed('S'))
-                paddle1.y += 0.5;
-            if (ispressed(VK_ESCAPE))
-                break;
-            // --- UPDATE ---
-            if (paddle1.y < 0)
-                paddle1.y = 0;
-            if (paddle2.y < 0)
-                paddle2.y = 0;
-            if (paddle1.y + paddle1.height > HEIGHT)
-                paddle1.y = HEIGHT - paddle1.height;
-            if (paddle2.y + paddle2.height > HEIGHT)
-                paddle2.y = HEIGHT - paddle2.height;
-            int it = 5;
-
-            ball.x += ball_dx;
-            ball.y += ball_dy;
-            if (ball.y <= 0)
-            {
-                ball.y = 0;
-                ball_dy = -ball_dy;
-            }
-            if (ball.y + ball.height > HEIGHT)
-            {
-                ball.y = HEIGHT - ball.height;
-                ball_dy = -ball_dy;
-            }
-            if (ball.collides(paddle1))
-            {
-                ball.x = paddle1.x + paddle1.width;
-                ball_dx = -ball_dx;
-            }
-            if (ball.collides(paddle2))
-            {
-                ball.x = paddle2.x - ball.width;
-                ball_dx = -ball_dx;
-            }
-
-            // --- RENDER ---
-
-            screen.draw(Rect(0, 0, WIDTH, HEIGHT), Color(0, 0, 0));
-            screen.draw(ball, Color(255, 0, 0));
-            screen.draw(paddle1, Color(255, 165, 0));
-            screen.draw(paddle2, Color(255, 165, 0));
-            cout << move_cursor(0, 0);
-            cout << Color(0, 0, 0).background() << Color(255, 255, 255).foreground(); // Reset colors
-            cout << "FPS: " << fps;
-            break;
-        }
-
-        cout << screen.changes() << flush;
+        update();
+        render();
+        print_fps(real_fps);
         screen.update();
+        tick(frame_start, FPS);
+    }
+    virtual void update() = 0;
+    virtual void render() = 0;
+};
 
-        // --- FRAME LIMIT ---
-        frame_time =
-            chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - frame_start).count();
+//----------------------------------------------------------------------------------------------------------------------
 
-        while (std::chrono::steady_clock::now() - frame_start < std::chrono::milliseconds(FRAME_TIME + 1))
+struct Snake
+{
+    vector<Rect> segments;
+    Rect head;
+    Color head_color;
+    Color segment_color;
+    bool alive = true;
+    int direction; // 0: up, 1: right, 2: down, 3: left
+    Snake(int x, int y, int segment_size, Color head_color, Color segment_color) : direction(rand() % 4), head_color(head_color), segment_color(segment_color)
+    {
+        head = Rect(x, y, segment_size, segment_size);
+        segments.push_back(Rect(x - segment_size, y, segment_size, segment_size));
+    }
+};
+
+class SnakeGame : public Game
+{
+    int segment_size = 2;
+    Snake snake1 = Snake(rand() % clamp(WIDTH / segment_size, 1, WIDTH / segment_size) * segment_size, rand() % clamp(HEIGHT / segment_size, 1, HEIGHT / segment_size) * segment_size, segment_size, Color(0, 255, 0), Color(0, 200, 0));
+    Rect food = Rect(rand() % (WIDTH / segment_size) * segment_size, rand() % (HEIGHT / segment_size) * segment_size, segment_size, segment_size);
+
+public:
+    SnakeGame(int fps, int width, int height) : Game(fps, width, height) {}
+    void update() override
+    {
+        if (snake1.alive)
         {
-            _mm_pause(); // For CPU efficiency
+            if (ispressed(VK_UP) && snake1.direction != 2)
+                snake1.direction = 0;
+            else if (ispressed(VK_RIGHT) && snake1.direction != 3)
+                snake1.direction = 1;
+            else if (ispressed(VK_DOWN) && snake1.direction != 0)
+                snake1.direction = 2;
+            else if (ispressed(VK_LEFT) && snake1.direction != 1)
+                snake1.direction = 3;
+
+            for (const auto &segment : snake1.segments)
+            {
+                if (snake1.head.collides(segment))
+                {
+                    snake1.alive = false;
+                    break;
+                }
+            }
+
+            bool ate_food = false;
+            if (snake1.head.collides(food))
+            {
+                food = Rect(rand() % (WIDTH / segment_size) * segment_size, rand() % (HEIGHT / segment_size) * segment_size, segment_size, segment_size);
+                while (find(snake1.segments.begin(), snake1.segments.end(), food) != snake1.segments.end() || snake1.head == food)
+                {
+                    food = Rect(rand() % (WIDTH / segment_size) * segment_size, rand() % (HEIGHT / segment_size) * segment_size, segment_size, segment_size);
+                }
+                ate_food = true;
+            }
+            snake1.segments.insert(snake1.segments.begin(), snake1.head);
+            switch (snake1.direction)
+            {
+            case 0:
+                snake1.head = {Rect(snake1.head.x, ((int)snake1.head.y - segment_size + HEIGHT) % HEIGHT, segment_size, segment_size)};
+                break;
+            case 1:
+                snake1.head = {Rect(((int)snake1.head.x + segment_size) % WIDTH, snake1.head.y, segment_size, segment_size)};
+                break;
+            case 2:
+                snake1.head = {Rect(snake1.head.x, ((int)snake1.head.y + segment_size) % HEIGHT, segment_size, segment_size)};
+                break;
+            case 3:
+                snake1.head = {Rect(((int)snake1.head.x - segment_size + WIDTH) % WIDTH, snake1.head.y, segment_size, segment_size)};
+                break;
+            }
+            if (!ate_food)
+            {
+                snake1.segments.pop_back();
+            }
         }
     }
+    void render() override
+    {
+        screen.draw(Rect(0, 0, WIDTH, HEIGHT), Color(0, 0, 0));
+        screen.draw(food, Color(255, 0, 0));
+        if (snake1.alive)
+        {
+            screen.draw(snake1.head, snake1.head_color);
+            for (const auto &segment : snake1.segments)
+            {
+                screen.draw(segment, snake1.segment_color);
+            }
+        }
+    }
+};
 
+int main()
+{
+
+    const auto FPS = 10, WIDTH = 120, HEIGHT = 29 * 2;
+    auto game = SnakeGame(FPS, WIDTH, HEIGHT);
+
+    while (game.runs())
+    {
+        game.run();
+    }
     return 0;
 }
