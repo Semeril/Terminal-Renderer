@@ -63,11 +63,6 @@ struct Texture
     Texture(initializer_list<Color> list, int w, int h) : data(list), width(w), height(h) {}
 };
 
-struct Text
-{
-    string s;
-};
-
 string move_cursor(int x, int y)
 {
     return "\033[" + to_string(y + 1) + ";" + to_string(x + 1) + "H";
@@ -131,6 +126,10 @@ class Screen
     }
 
 public:
+    void print(string s, Color bg, Color text_color, int x, int y)
+    {
+        cout << move_cursor(x, y) << bg.background() << text_color.foreground() << s;
+    }
     void draw(Rect rect, Color color)
     {
         rect = round_values(rect);
@@ -350,6 +349,7 @@ public:
                 screen.draw(segment, snake1.segment_color);
             }
         }
+        screen.print("Score: " + to_string(snake1.segments.size() - 1), Color(0, 0, 0), Color(0, 255, 0), 0, 1);
     }
 };
 
