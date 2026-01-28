@@ -52,6 +52,7 @@ struct Cell
     {
         return upper_color != other.upper_color || lower_color != other.lower_color;
     }
+    bool forced_to_update = false;
 };
 
 struct Texture
@@ -87,9 +88,9 @@ class Screen
     string canvas()
     {
         string c = u8"\033[48;2;255;255;255m";
-        for (size_t y = 0; y < height; y++)
+        for (int y = 0; y < height; y++)
         {
-            for (size_t x = 0; x < width; x++)
+            for (int x = 0; x < width; x++)
             {
                 c += u8" ";
             }
@@ -105,11 +106,11 @@ class Screen
     {
         int last_x, last_y;
         string changes;
-        for (size_t y = 0; y < height; y++)
+        for (int y = 0; y < height; y++)
         {
-            for (size_t x = 0; x < width; x++)
+            for (int x = 0; x < width; x++)
             {
-                if (back_buffer.at(y * width + x) != front_buffer.at(y * width + x))
+                if (back_buffer.at(y * width + x) != front_buffer.at(y * width + x) || back_buffer.at(y * width + x).forced_to_update)
                 {
                     if (x != last_x + 1 || y != last_y)
                     {
@@ -119,15 +120,32 @@ class Screen
                     changes += back_buffer.at(y * width + x).lower_color.background();
                     changes += u8"▀";
                     last_x = x, last_y = y;
+                    back_buffer.at(y * width + x).forced_to_update = false;
                 }
             }
         }
         return changes;
     }
+    void force_to_update(Rect area)
+    {
+        area = round_values(area);
+        for (int dy = 0; dy < area.height; dy++)
+        {
+            for (int dx = 0; dx < area.width; dx++)
+            {
+                if (area.y + dy >= height || area.x + dx >= width || area.y + dy < 0 || area.x + dx < 0)
+                    continue;
+                else
+                    // back_buffer.at((area.y + dy) * width + (area.x + dx)).forced_to_update = true;
+                    back_buffer.at((area.y + dy) * width + (area.x + dx)) = Cell(Color(1, 2, 3), Color(4, 5, 6)); // Hack to force update
+            }
+        }
+    }
 
 public:
     void print(string s, Color bg, Color text_color, int x, int y)
     {
+        force_to_update(Rect(x, y, s.length(), 1));
         cout << move_cursor(x, y) << bg.background() << text_color.foreground() << s;
     }
     void draw(Rect rect, Color color)
@@ -202,10 +220,6 @@ void tick(std::chrono::_V2::steady_clock::time_point &frame_start, const int FPS
         _mm_pause();
     }
 }
-void print_fps(int real_fps)
-{
-    cout << move_cursor(0, 0) << Color(0, 0, 0).background() << Color(255, 255, 255).foreground() << "FPS: " << real_fps;
-}
 
 /// @brief Base class for creating a console game.
 /// Inherit from this class and implement the update() and render() methods.
@@ -250,7 +264,7 @@ public:
         screen.clear();
         update();
         render();
-        print_fps(real_fps);
+        screen.print("FPS: " + to_string(real_fps), Color(0, 0, 0), Color(255, 255, 255), 0, 0);
         screen.update();
         tick(frame_start, FPS);
     }
