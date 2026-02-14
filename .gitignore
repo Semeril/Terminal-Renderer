@@ -8,7 +8,7 @@ out/
 bin/
 
 lib/
-
+.vscode/
 # =========================
 # CMake generated files
 # =========================
