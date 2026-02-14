@@ -1,3 +1,0 @@
-C:\cmake-4.2.0-windows-x86_64\bin\cmake.exe -E rm -f CMakeFiles\game_in_cmd.dir/objects.a
-C:\MinGW\bin\ar.exe qc CMakeFiles\game_in_cmd.dir/objects.a @CMakeFiles\game_in_cmd.dir\objects1.rsp
-C:\MinGW\bin\g++.exe -g -Wl,--whole-archive CMakeFiles\game_in_cmd.dir/objects.a -Wl,--no-whole-archive -o game_in_cmd.exe -Wl,--out-implib,libgame_in_cmd.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\game_in_cmd.dir\linkLibs.rsp
